@@ -565,25 +565,28 @@
     playRingtone();
   }
 
-  $('#accept-call-btn').addEventListener('click', () => {
-    logCall('Accepting incoming call');
-    incomingCallModal.classList.add('hidden');
-    stopRingtone();
-    
-    callOverlay.classList.remove('hidden');
-    const caller = contacts.find(c => c.id === currentCall.userId);
-    if (caller) {
-      $('#call-name').textContent = caller.displayName;
-      setAvatarEl($('#call-avatar'), caller);
-    }
-    $('#call-status').textContent = 'Connecting...';
+    $('#accept-call-btn').addEventListener('click', async () => {
+      logCall('Accepting incoming call');
+      incomingCallModal.classList.add('hidden');
+      stopRingtone();
+      
+      callOverlay.classList.remove('hidden');
+      const caller = contacts.find(c => c.id === currentCall.userId);
+      if (caller) {
+        $('#call-name').textContent = caller.displayName;
+        setAvatarEl($('#call-avatar'), caller);
+      }
+      $('#call-status').textContent = 'Connecting...';
+  
+      // Get camera/mic BEFORE telling the caller we accepted, so the offer arrives after tracks are added
+      await createPeerConnection(false);
 
-    firestore.collection('signaling').doc(currentCall.id).update({
-      status: 'accepted'
+      if (currentCall?.id) {
+        firestore.collection('signaling').doc(currentCall.id).update({
+          status: 'accepted'
+        });
+      }
     });
-
-    createPeerConnection(false);
-  });
 
   $('#reject-call-btn').addEventListener('click', () => {
     logCall('Rejecting incoming call');
