@@ -249,6 +249,10 @@
       .onSnapshot((snapshot) => {
         snapshot.docChanges().forEach(change => {
           if (change.type === 'added') handleSignaling(change.doc.data(), change.doc);
+          if (change.type === 'removed' && currentCall) {
+            logCall('Incoming signaling doc removed');
+            endCall();
+          }
         });
       });
 
@@ -257,7 +261,10 @@
       .onSnapshot((snapshot) => {
         snapshot.docChanges().forEach(change => {
           if (change.type === 'modified') handleSignaling(change.doc.data(), change.doc);
-          if (change.type === 'removed') endCall();
+          if (change.type === 'removed' && currentCall) {
+            logCall('Outgoing signaling doc removed');
+            endCall();
+          }
         });
       });
   }
