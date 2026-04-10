@@ -190,6 +190,19 @@
       currentUser = { id: docRef.id, username, displayName };
       localStorage.setItem('familylink_user', JSON.stringify(currentUser));
       initChat();
+
+      // Broadcast to existing users
+      const allUsers = await firestore.collection('users').get();
+      allUsers.docs.forEach(d => {
+        const u = d.data();
+        if (d.id !== docRef.id && u.fcmToken) {
+          fetch('/api/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: u.fcmToken, title: "New Family Member 🎉", body: `${displayName} just joined FamilyLink!` })
+          });
+        }
+      });
     } catch (err) {
       registerError.textContent = err.message;
       registerError.classList.remove('hidden');
@@ -270,6 +283,18 @@
 
     // Listen for users
     firestore.collection('users').onSnapshot((snapshot) => {
+      snapshot.docChanges().forEach(change => {
+        if (change.type === 'added') {
+          const u = change.doc.data();
+          const created = u.createdAt?.toMillis ? u.createdAt.toMillis() : 0;
+          if (created > Date.now() - 10000 && change.doc.id !== currentUser.id) {
+            if ('Notification' in window && Notification.permission === 'granted') {
+              new Notification('New Family Member 🎉', { body: `${u.displayName} just joined FamilyLink!` });
+            }
+          }
+        }
+      });
+
       contacts = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() }))
         .filter(u => u.id !== currentUser.id);

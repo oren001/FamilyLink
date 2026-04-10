@@ -3,38 +3,38 @@
    ═══════════════════════════════════════════════════════ */
 
 :root {
-  /* Color System */
-  --bg-primary: #0a0a0f;
-  --bg-secondary: #12121a;
-  --bg-tertiary: #1a1a28;
-  --bg-surface: #1e1e2e;
-  --bg-hover: #252538;
-  --bg-active: #2a2a42;
+  /* Vibrant Color System */
+  --bg-primary: #120a1f;       /* Deep rich plum/purple background */
+  --bg-secondary: #1a0e2d;     /* Slightly lighter for sidebar elements */
+  --bg-tertiary: #251340;
+  --bg-surface: #2d184d;
+  --bg-hover: #3b1d61;
+  --bg-active: #4a2476;
   
-  --text-primary: #e8e8f0;
-  --text-secondary: #9898b0;
-  --text-muted: #686884;
-  --text-inverse: #0a0a0f;
+  --text-primary: #f8f6ff;
+  --text-secondary: #c0b7d8;
+  --text-muted: #8c82a8;
+  --text-inverse: #120a1f;
   
-  --accent-primary: #6366f1;
-  --accent-secondary: #8b5cf6;
-  --accent-gradient: linear-gradient(135deg, #6366f1, #8b5cf6);
-  --accent-glow: rgba(99, 102, 241, 0.3);
+  --accent-primary: #ec4899;   /* Vibrant pink */
+  --accent-secondary: #8b5cf6; /* Vibrant purple */
+  --accent-gradient: linear-gradient(135deg, #f43f5e, #8b5cf6);
+  --accent-glow: rgba(244, 63, 94, 0.4);
   
-  --success: #4ade80;
-  --danger: #ef4444;
+  --success: #34d399;
+  --danger: #fb7185;
   --warning: #fbbf24;
   
-  --msg-sent-bg: linear-gradient(135deg, #4f46e5, #6d5ad8);
-  --msg-received-bg: #1e1e2e;
+  --msg-sent-bg: linear-gradient(135deg, #ec4899, #8b5cf6);
+  --msg-received-bg: #2d184d;
   
-  --border-color: rgba(255, 255, 255, 0.06);
-  --border-glow: rgba(99, 102, 241, 0.2);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-glow: rgba(236, 72, 153, 0.25);
   
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.15);
+  --shadow-glow: 0 0 20px rgba(236, 72, 153, 0.25);
   
   --radius-sm: 8px;
   --radius-md: 12px;
