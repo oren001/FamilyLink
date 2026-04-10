@@ -272,7 +272,7 @@
   </div>
 
   <!-- Global Version Tag -->
-  <div class="global-version-tag">v1.4.2</div>
+  <div class="global-version-tag">v1.5.0</div>
 
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -288,13 +288,13 @@
   <!-- Add Contact Modal -->
   <div id="add-contact-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:10000; align-items:center; justify-content:center;">
     <div style="background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:16px; padding:28px; width:320px; max-width:90vw; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
-      <h3 style="margin:0 0 8px; font-size:18px;">Add Contact</h3>
-      <p style="margin:0 0 20px; color:var(--text-muted); font-size:13px;">Enter their username to connect</p>
-      <input type="text" id="add-contact-input" placeholder="username" autocomplete="off"
+      <h3 style="margin:0 0 8px; font-size:18px;">Invite someone</h3>
+      <p style="margin:0 0 20px; color:var(--text-muted); font-size:13px;">Enter their name to generate a magic link</p>
+      <input type="text" id="add-contact-input" placeholder="e.g. Grandma" autocomplete="off"
         style="width:100%; padding:10px 14px; background:var(--bg-tertiary); border:1px solid var(--border-color); border-radius:8px; color:var(--text-primary); font-size:14px; box-sizing:border-box; margin-bottom:12px;">
       <div id="add-contact-error" style="color:var(--danger); font-size:13px; margin-bottom:12px; display:none;"></div>
       <div style="display:flex; gap:10px;">
-        <button class="btn btn-primary" id="add-contact-submit" style="flex:1;">Add</button>
+        <button class="btn btn-primary" id="add-contact-submit" style="flex:1;">Copy Link</button>
         <button class="btn" id="add-contact-cancel" style="flex:1; background:var(--bg-tertiary); color:var(--text-secondary);">Cancel</button>
       </div>
     </div>
