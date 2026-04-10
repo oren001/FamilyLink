@@ -455,7 +455,7 @@
       }
       const isSent = msg.fromUserId === currentUser.id;
       const contentHtml = msg.type === 'voice' 
-        ? `<div class="voice-message"><audio src="${msg.audioUrl}" controls></audio></div>`
+        ? `<div class="voice-message"><audio src="${msg.audioData || msg.audioUrl}" controls></audio></div>`
         : `<div class="message-content">${escapeHtml(msg.content)}</div>`;
       html += `
         <div class="message ${isSent ? 'sent' : 'received'}">
@@ -557,27 +557,29 @@
     const oldStatus = $('#chat-status').textContent;
     $('#chat-status').textContent = 'Sending voice message...';
 
-    const fileName = `voice_${Date.now()}.webm`;
-    const chatId = [currentUser.id, activeChat.id].sort().join('_');
-
     try {
-      const storageRef = storage.ref(`chats/${chatId}/${fileName}`);
-      const snapshot = await storageRef.put(audioBlob);
-      const audioUrl = await snapshot.ref.getDownloadURL();
-      sendVoiceMessage(audioUrl);
+      // Convert blob to base64 — no Storage plan needed
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result); // result is "data:audio/webm;base64,..."
+        reader.onerror = reject;
+        reader.readAsDataURL(audioBlob);
+      });
+
+      sendVoiceMessage(base64);
     } catch (e) {
-      console.error('Upload error', e);
-      alert('Failed to send voice message. Check Firebase Storage rules.\n' + e.message);
+      console.error('Voice message error', e);
+      alert('Failed to send voice message: ' + e.message);
     } finally {
       $('#chat-status').textContent = oldStatus;
     }
   }
 
-  function sendVoiceMessage(audioUrl) {
+  function sendVoiceMessage(audioData) {
     const chatId = [currentUser.id, activeChat.id].sort().join('_');
     firestore.collection('messages').add({
       chatId, fromUserId: currentUser.id, toUserId: activeChat.id,
-      content: 'Voice message', type: 'voice', audioUrl, read: false,
+      content: 'Voice message', type: 'voice', audioData, read: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     triggerPushNotification(activeChat.id, `New voice message from ${currentUser.displayName}`, '🎤 Voice message');
