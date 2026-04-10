@@ -43,6 +43,7 @@
   let ringtoneInterval = null;
   let ringtoneContext = null;
   let callStartTime = null;
+  let debugLogs = [];
 
   // ─── DOM Elements ─────────────────────────────────────
 
@@ -410,7 +411,48 @@
 
   function logCall(msg, data = {}) {
     const time = new Date().toLocaleTimeString();
-    console.log(`%c[Call ${time}] ${msg}`, 'color: #8b5cf6; font-weight: bold;', data);
+    const logMsg = `[${time}] ${msg}`;
+    console.log(`%c${logMsg}`, 'color: #8b5cf6; font-weight: bold;', data);
+    
+    // UI Logging
+    debugLogs.push({ time, msg, data: JSON.stringify(data) });
+    if (debugLogs.length > 50) debugLogs.shift();
+    updateDebugUI();
+  }
+
+  function updateDebugUI() {
+    const panel = $('#debug-panel');
+    if (!panel) return;
+    panel.innerHTML = debugLogs.map(l => 
+      `<div class="debug-line"><strong>${l.time}</strong> ${l.msg} <small>${l.data}</small></div>`
+    ).join('');
+    panel.scrollTop = panel.scrollHeight;
+  }
+
+  // Create debug-panel if it doesn't exist
+  if (!$('#debug-container')) {
+    const container = document.createElement('div');
+    container.id = 'debug-container';
+    container.style = 'position:fixed; bottom:0; left:0; width:100%; height:150px; background:rgba(0,0,0,0.85); color:#0f0; font-family:monospace; font-size:10px; overflow-y:auto; z-index:10000; border-top:1px solid #444; display:none; padding:5px; pointer-events:none;';
+    const panel = document.createElement('div');
+    panel.id = 'debug-panel';
+    container.appendChild(panel);
+    document.body.appendChild(container);
+
+    // Toggle with 5 taps on the header
+    let taps = 0;
+    const header = $('.side-header') || $('.sidebar-header');
+    if (header) {
+      header.addEventListener('click', () => {
+        taps++;
+        if (taps === 5) {
+          container.style.display = container.style.display === 'none' ? 'block' : 'none';
+          container.style.pointerEvents = container.style.display === 'none' ? 'none' : 'auto';
+          taps = 0;
+        }
+        setTimeout(() => { taps = (taps > 0) ? taps - 1 : 0; }, 3000);
+      });
+    }
   }
 
   function startCall(type) {
@@ -538,8 +580,11 @@
       localStream = await navigator.mediaDevices.getUserMedia(constraints);
       
       if (currentCall.type === 'video') {
-        $('#local-video').srcObject = localStream;
-        $('#local-video').style.display = 'block';
+        const localVideo = $('#local-video');
+        localVideo.srcObject = localStream;
+        localVideo.style.display = 'block';
+        localVideo.muted = true; // Essential for autoplay
+        localVideo.play().catch(e => logCall('Local video play failed', e));
       }
 
       localStream.getTracks().forEach(track => {
@@ -553,9 +598,18 @@
     }
 
     peerConnection.ontrack = (event) => {
-      logCall('Remote track received');
-      $('#remote-video').srcObject = event.streams[0];
-      $('#remote-video').style.display = 'block';
+      logCall('Remote track received', { kind: event.track.kind, streams: event.streams.length });
+      const remoteVideo = $('#remote-video');
+      remoteVideo.srcObject = event.streams[0];
+      remoteVideo.style.display = 'block';
+      
+      // Ensure playback starts
+      remoteVideo.play().then(() => {
+        logCall('Remote video playing');
+      }).catch(e => {
+        logCall('Remote video play failed', e);
+      });
+
       $('#call-avatar-display').classList.add('hidden');
       $('#call-status').textContent = 'Connected';
       startCallTimer();
@@ -576,7 +630,10 @@
 
     if (isInitiator) {
       logCall('Creating WebRTC Offer');
-      const offer = await peerConnection.createOffer();
+      const offer = await peerConnection.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: currentCall.type === 'video'
+      });
       await peerConnection.setLocalDescription(offer);
       firestore.collection('signaling').add({
         fromUserId: currentUser.id,
@@ -589,18 +646,30 @@
   }
 
   async function handleWebRTCOffer(data, doc) {
-    if (peerConnection.signalingState !== 'stable') return;
-    logCall('Handling WebRTC Offer');
-    await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: data.sdp }));
-    const answer = await peerConnection.createAnswer();
-    await peerConnection.setLocalDescription(answer);
-    firestore.collection('signaling').add({
-      fromUserId: currentUser.id,
-      toUserId: currentCall.userId,
-      type: 'webrtc-answer',
-      sdp: answer.sdp,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    if (!peerConnection) {
+      logCall('PC not ready for offer, creating now');
+      await createPeerConnection(false);
+    }
+    if (peerConnection.signalingState !== 'stable') {
+      logCall('PC signaling state not stable:', { state: peerConnection.signalingState });
+    }
+    
+    logCall('Setting Remote Description (Offer)');
+    try {
+      await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: data.sdp }));
+      logCall('Creating WebRTC Answer');
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+      firestore.collection('signaling').add({
+        fromUserId: currentUser.id,
+        toUserId: currentCall.userId,
+        type: 'webrtc-answer',
+        sdp: answer.sdp,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    } catch (err) {
+      logCall('Offer Handling Error', err);
+    }
   }
 
   async function handleWebRTCAnswer(data) {
