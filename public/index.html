@@ -172,7 +172,15 @@
         <!-- Message Input -->
         <div class="message-input-area">
           <div class="message-input-wrapper">
-            <button class="mic-btn" id="mic-btn" title="Hold to record">`n                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">`n                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>`n                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>`n                  <line x1="12" y1="19" x2="12" y2="23"></line>`n                  <line x1="8" y1="23" x2="16" y2="23"></line>`n                </svg>`n              </button>`n              <textarea id="message-input" placeholder="Type a message..." rows="1"></textarea>
+            <button class="mic-btn" id="mic-btn" title="Hold to record">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="23"></line>
+                <line x1="8" y1="23" x2="16" y2="23"></line>
+              </svg>
+            </button>
+            <textarea id="message-input" placeholder="Type a message..." rows="1"></textarea>
           </div>
           <button class="send-btn" id="send-btn" disabled>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -256,7 +264,7 @@
   </div>
 
   <!-- Global Version Tag -->
-  <div class="global-version-tag">v1.3.0</div>
+  <div class="global-version-tag">v1.3.1</div>
 
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
