@@ -683,8 +683,38 @@ a:hover {
 }
 
 /* ─── Message Input ───────────────────────────────────── */
+.mic-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
 
-.mic-btn {`n    background: none;`n    border: none;`n    color: var(--text-muted);`n    padding: 8px;`n    cursor: pointer;`n    display: flex;`n    align-items: center;`n    justify-content: center;`n    transition: all 0.2s ease;`n    border-radius: 50%;`n  }`n  `n  .mic-btn:hover {`n    color: var(--accent-primary);`n    background: var(--bg-hover);`n  }`n  `n  .mic-btn.recording {`n    color: #fff;`n    background: var(--danger);`n    animation: pulseMic 1.5s infinite;`n  }`n  `n  @keyframes pulseMic {`n    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }`n    70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }`n    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }`n  }`n`n  .message-input-area {
+.mic-btn:hover {
+  color: var(--accent-primary);
+  background: var(--bg-hover);
+}
+
+.mic-btn.recording {
+  color: #fff;
+  background: var(--danger);
+  animation: pulseMic 1.5s infinite;
+}
+
+@keyframes pulseMic {
+  0%   { transform: scale(1);   box-shadow: 0 0 0 0   rgba(251, 113, 133, 0.7); }
+  70%  { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(251, 113, 133, 0); }
+  100% { transform: scale(1);   box-shadow: 0 0 0 0   rgba(251, 113, 133, 0); }
+}
+
+.message-input-area {
   display: flex;
   align-items: flex-end;
   gap: 10px;
