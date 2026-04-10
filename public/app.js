@@ -78,10 +78,8 @@
 
   const authScreen = $('#auth-screen');
   const chatScreen = $('#chat-screen');
-  const loginForm = $('#login-form');
-  const registerForm = $('#register-form');
-  const loginError = $('#login-error');
-  const registerError = $('#register-error');
+  const authForm = $('#auth-form');
+  const authError = $('#auth-error');
   const sidebar = $('#sidebar');
   const contactsList = $('#contacts-list');
   const chatEmpty = $('#chat-empty');
@@ -153,86 +151,57 @@
     }
   } catch (e) {}
 
-  // Toggle forms
-  $('#show-register').addEventListener('click', (e) => {
+  // Auth Logic (Login / Register combined)
+  authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    loginForm.classList.add('hidden');
-    registerForm.classList.remove('hidden');
-    loginError.classList.add('hidden');
-  });
+    authError.classList.add('hidden');
+    const displayName = $('#auth-name').value.trim();
+    if (!displayName) return;
 
-  $('#show-login').addEventListener('click', (e) => {
-    e.preventDefault();
-    registerForm.classList.add('hidden');
-    loginForm.classList.remove('hidden');
-    registerError.classList.add('hidden');
-  });
-
-  // Login
-  loginForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    loginError.classList.add('hidden');
-    const username = $('#login-username').value.trim().toLowerCase();
+    // Generate a simple username from the display name
+    const username = displayName.toLowerCase().replace(/\s+/g, '');
 
     try {
-      const snapshot = await firestore.collection('users')
-        .where('username', '==', username)
-        .get();
-
-      if (snapshot.empty) throw new Error('User not found');
-
-      const userData = snapshot.docs[0].data();
-      const userId = snapshot.docs[0].id;
-
-      currentUser = { id: userId, username: userData.username, displayName: userData.displayName };
-      localStorage.setItem('familylink_user', JSON.stringify(currentUser));
-      initChat();
-    } catch (err) {
-      loginError.textContent = err.message;
-      loginError.classList.remove('hidden');
-      loginForm.classList.add('shake');
-      setTimeout(() => loginForm.classList.remove('shake'), 400);
-    }
-  });
-
-  // Register
-  registerForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    registerError.classList.add('hidden');
-    const username = $('#reg-username').value.trim().toLowerCase();
-    const displayName = $('#reg-displayname').value.trim();
-
-    try {
-      const existing = await firestore.collection('users').where('username', '==', username).get();
-      if (!existing.empty) throw new Error('Username taken');
-
-      const docRef = await firestore.collection('users').add({
-        username, displayName,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        online: true
-      });
+      // Check if user exists
+      const snapshot = await firestore.collection('users').where('username', '==', username).get();
       
-      currentUser = { id: docRef.id, username, displayName };
+      if (!snapshot.empty) {
+        // User exists -> Login
+        const userData = snapshot.docs[0].data();
+        const userId = snapshot.docs[0].id;
+        currentUser = { id: userId, username: userData.username, displayName: userData.displayName };
+      } else {
+        // User doesn't exist -> Register
+        const docRef = await firestore.collection('users').add({
+          username, displayName,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          online: true
+        });
+        currentUser = { id: docRef.id, username, displayName };
+        
+        // Push notification broadcast (optional, currently uses fcmToken from others)
+        const allUsers = await firestore.collection('users').get();
+        allUsers.docs.forEach(d => {
+          const u = d.data();
+          if (d.id !== docRef.id && u.fcmToken) {
+            fetch('/api/notify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: u.fcmToken, title: "New Family Member 🎉", body: `${displayName} just joined FamilyLink!` })
+            });
+          }
+        });
+      }
+
+      // Save session & init
       localStorage.setItem('familylink_user', JSON.stringify(currentUser));
       initChat();
-
-      // Broadcast to existing users
-      const allUsers = await firestore.collection('users').get();
-      allUsers.docs.forEach(d => {
-        const u = d.data();
-        if (d.id !== docRef.id && u.fcmToken) {
-          fetch('/api/notify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: u.fcmToken, title: "New Family Member 🎉", body: `${displayName} just joined FamilyLink!` })
-          });
-        }
-      });
     } catch (err) {
-      registerError.textContent = err.message;
-      registerError.classList.remove('hidden');
-      registerForm.classList.add('shake');
-      setTimeout(() => registerForm.classList.remove('shake'), 400);
+      console.error(err);
+      authError.textContent = 'Something went wrong. Please try again.';
+      authError.classList.remove('hidden');
+      authForm.classList.add('shake');
+      setTimeout(() => authForm.classList.remove('shake'), 400);
     }
   });
 
