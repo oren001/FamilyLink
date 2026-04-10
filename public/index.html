@@ -83,11 +83,18 @@
           <div class="avatar avatar-sm" id="sidebar-avatar"></div>
           <span class="sidebar-username" id="sidebar-username"></span>
         </div>
-        <button class="icon-btn" id="logout-btn" title="Logout">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
-          </svg>
-        </button>
+        <div style="display:flex;gap:6px;">
+          <button class="icon-btn" id="add-contact-btn" title="Add Contact">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
+            </svg>
+          </button>
+          <button class="icon-btn" id="logout-btn" title="Logout">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+            </svg>
+          </button>
+        </div>
       </div>
       
       <div class="sidebar-search">
@@ -264,7 +271,7 @@
   </div>
 
   <!-- Global Version Tag -->
-  <div class="global-version-tag">v1.3.4</div>
+  <div class="global-version-tag">v1.4.0</div>
 
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -276,6 +283,20 @@
   <div id="recording-indicator" style="display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:rgba(251,113,133,0.95); color:#fff; padding:10px 20px; border-radius:30px; font-size:14px; font-weight:600; z-index:9999; align-items:center; gap:8px; box-shadow:0 4px 20px rgba(251,113,133,0.5);">
     <span style="width:10px;height:10px;border-radius:50%;background:#fff;display:inline-block;animation:pulseMic 1s infinite;"></span>
     Recording... <span id="rec-timer">0s</span> — release to send
+  </div>
+  <!-- Add Contact Modal -->
+  <div id="add-contact-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:10000; align-items:center; justify-content:center;">
+    <div style="background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:16px; padding:28px; width:320px; max-width:90vw; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+      <h3 style="margin:0 0 8px; font-size:18px;">Add Contact</h3>
+      <p style="margin:0 0 20px; color:var(--text-muted); font-size:13px;">Enter their username to connect</p>
+      <input type="text" id="add-contact-input" placeholder="username" autocomplete="off"
+        style="width:100%; padding:10px 14px; background:var(--bg-tertiary); border:1px solid var(--border-color); border-radius:8px; color:var(--text-primary); font-size:14px; box-sizing:border-box; margin-bottom:12px;">
+      <div id="add-contact-error" style="color:var(--danger); font-size:13px; margin-bottom:12px; display:none;"></div>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-primary" id="add-contact-submit" style="flex:1;">Add</button>
+        <button class="btn" id="add-contact-cancel" style="flex:1; background:var(--bg-tertiary); color:var(--text-secondary);">Cancel</button>
+      </div>
+    </div>
   </div>
   <script src="app.js"></script>
 </body>
