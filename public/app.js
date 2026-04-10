@@ -5,6 +5,15 @@
 (function() {
   'use strict';
 
+  // ─── PWA Service Worker ──────────────────────────────
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/service-worker.js')
+        .then(reg => console.log('ServiceWorker registered'))
+        .catch(err => console.log('ServiceWorker failed', err));
+    });
+  }
+
   // ─── Firebase Config ──────────────────────────────────
   const firebaseConfig = {
     apiKey: "AIzaSyCcnpQDPsQptHdZKHupXOZNqNbO1JOD1Ss",
