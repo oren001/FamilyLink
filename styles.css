@@ -615,7 +615,7 @@ a:hover {
   border-bottom-left-radius: 4px;
 }
 
-.message-content {
+.voice-message {`n    display: flex;`n    align-items: center;`n    gap: 10px;`n    min-width: 200px;`n  }`n  `n  .voice-message audio {`n    height: 36px;`n    border-radius: 18px;`n    max-width: 100%;`n  }`n`n  .message-content {
   font-size: 14px;
   line-height: 1.45;
   white-space: pre-wrap;
@@ -684,7 +684,7 @@ a:hover {
 
 /* ─── Message Input ───────────────────────────────────── */
 
-.message-input-area {
+.mic-btn {`n    background: none;`n    border: none;`n    color: var(--text-muted);`n    padding: 8px;`n    cursor: pointer;`n    display: flex;`n    align-items: center;`n    justify-content: center;`n    transition: all 0.2s ease;`n    border-radius: 50%;`n  }`n  `n  .mic-btn:hover {`n    color: var(--accent-primary);`n    background: var(--bg-hover);`n  }`n  `n  .mic-btn.recording {`n    color: #fff;`n    background: var(--danger);`n    animation: pulseMic 1.5s infinite;`n  }`n  `n  @keyframes pulseMic {`n    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }`n    70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }`n    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }`n  }`n`n  .message-input-area {
   display: flex;
   align-items: flex-end;
   gap: 10px;

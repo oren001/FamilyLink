@@ -46,6 +46,7 @@
 
   firebase.initializeApp(firebaseConfig);
   const firestore = firebase.firestore();
+  const storage = firebase.storage();
 
   // ─── State ────────────────────────────────────────────
 
@@ -453,9 +454,12 @@
         html += `<div class="message-date-divider"><span>${msgDate}</span></div>`;
       }
       const isSent = msg.fromUserId === currentUser.id;
+      const contentHtml = msg.type === 'voice' 
+        ? `<div class="voice-message"><audio src="${msg.audioUrl}" controls></audio></div>`
+        : `<div class="message-content">${escapeHtml(msg.content)}</div>`;
       html += `
         <div class="message ${isSent ? 'sent' : 'received'}">
-          <div class="message-content">${escapeHtml(msg.content)}</div>
+          ${contentHtml}
           <div class="message-time">${formatTime(msg.createdAt)}${isSent ? (msg.read ? ' ✓✓' : ' ✓') : ''}</div>
         </div>`;
     });
@@ -484,6 +488,70 @@
   sendBtn.addEventListener('click', sendMessage);
   messageInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
   messageInput.addEventListener('input', () => { sendBtn.disabled = !messageInput.value.trim(); });
+
+  // ─── Voice Recording ──────────────────────────────────
+  let mediaRecorder;
+  let audioChunks = [];
+  const micBtn = $('#mic-btn');
+
+  micBtn.addEventListener('mousedown', startRecording);
+  micBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
+  window.addEventListener('mouseup', stopRecording);
+  window.addEventListener('touchend', stopRecording);
+
+  async function startRecording() {
+    if (!activeChat) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      audioChunks = [];
+      mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+      mediaRecorder.onstop = uploadRecording;
+      mediaRecorder.start();
+      micBtn.classList.add('recording');
+      console.log('Recording started...');
+    } catch (e) {
+      console.error("Recording error", e);
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+      micBtn.classList.remove('recording');
+      mediaRecorder.stream.getTracks().forEach(t => t.stop());
+      console.log('Recording stopped.');
+    }
+  }
+
+  async function uploadRecording() {
+    if (audioChunks.length === 0) return;
+    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+    if (audioBlob.size < 1000) return; // Ignore very short taps
+
+    const fileName = `voice_${Date.now()}.webm`;
+    const chatId = [currentUser.id, activeChat.id].sort().join('_');
+    const storageRef = storage.ref(`chats/${chatId}/${fileName}`);
+    
+    try {
+      const snapshot = await storageRef.put(audioBlob);
+      const audioUrl = await snapshot.ref.getDownloadURL();
+      sendVoiceMessage(audioUrl);
+    } catch (e) {
+      console.error("Upload error", e);
+    }
+  }
+
+  function sendVoiceMessage(audioUrl) {
+    const chatId = [currentUser.id, activeChat.id].sort().join('_');
+    firestore.collection('messages').add({
+      chatId, fromUserId: currentUser.id, toUserId: activeChat.id,
+      content: 'Voice message', type: 'voice', audioUrl, read: false,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    triggerPushNotification(activeChat.id, `New voice message from ${currentUser.displayName}`, '🎤 Voice message');
+    scrollToBottom();
+  }
 
   function updateChatStatus() {
     if (!activeChat) return;
