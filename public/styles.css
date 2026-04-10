@@ -294,9 +294,9 @@ a:hover {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  padding-top: calc(16px + env(safe-area-inset-top));
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
   border-bottom: 1px solid var(--border-color);
-  height: calc(var(--header-height) + env(safe-area-inset-top));
+  height: calc(var(--header-height) + env(safe-area-inset-top, 0px));
 }
 
 .sidebar-user-info {
@@ -505,9 +505,9 @@ a:hover {
   padding: 0 20px;
   height: var(--header-height);
   min-height: var(--header-height);
-  height: calc(var(--header-height) + env(safe-area-inset-top));
-  min-height: calc(var(--header-height) + env(safe-area-inset-top));
-  padding-top: env(safe-area-inset-top);
+  height: calc(var(--header-height) + env(safe-area-inset-top, 0px));
+  min-height: calc(var(--header-height) + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
   z-index: 50;
@@ -992,7 +992,7 @@ a:hover {
   }
 
   .messages-container {
-    padding-top: calc(var(--header-height) + env(safe-area-inset-top) + 10px);
+    padding-top: calc(var(--header-height) + env(safe-area-inset-top, 0px) + 10px);
   }
   
   .chat-area {
