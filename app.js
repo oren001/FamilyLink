@@ -67,6 +67,10 @@
   let callStartTime = null;
   let debugLogs = [];
 
+  // ─── E2EE State ───────────────────────────────────────
+  let myPrivateKey = null;
+  const sharedKeyCache = {};
+
   // ─── DOM Elements ─────────────────────────────────────
 
   const $ = (sel) => document.querySelector(sel);
@@ -260,6 +264,79 @@
 
     connectMessaging();
     registerPushNotifications();
+    initEncryption();
+  }
+
+  // ─── E2EE Crypto ──────────────────────────────────────
+
+  async function initEncryption() {
+    try {
+      const storedPriv = localStorage.getItem(`privKey_${currentUser.id}`);
+      const storedPub  = localStorage.getItem(`pubKey_${currentUser.id}`);
+
+      if (storedPriv && storedPub) {
+        myPrivateKey = await crypto.subtle.importKey(
+          'jwk', JSON.parse(storedPriv),
+          { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveKey']
+        );
+        // Refresh public key in Firestore (in case it was cleared)
+        await firestore.collection('users').doc(currentUser.id).update({ publicKeyJwk: JSON.parse(storedPub) });
+      } else {
+        const kp = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']);
+        const privJwk = await crypto.subtle.exportKey('jwk', kp.privateKey);
+        const pubJwk  = await crypto.subtle.exportKey('jwk', kp.publicKey);
+        localStorage.setItem(`privKey_${currentUser.id}`, JSON.stringify(privJwk));
+        localStorage.setItem(`pubKey_${currentUser.id}`,  JSON.stringify(pubJwk));
+        myPrivateKey = kp.privateKey;
+        await firestore.collection('users').doc(currentUser.id).update({ publicKeyJwk: pubJwk });
+      }
+      console.log('E2EE ready 🔒');
+    } catch (e) {
+      console.error('E2EE init failed', e);
+    }
+  }
+
+  async function getSharedKey(otherUserId) {
+    if (sharedKeyCache[otherUserId]) return sharedKeyCache[otherUserId];
+    if (!myPrivateKey) return null;
+    try {
+      const doc = await firestore.collection('users').doc(otherUserId).get();
+      const pubJwk = doc.data()?.publicKeyJwk;
+      if (!pubJwk) return null;
+      const theirKey = await crypto.subtle.importKey(
+        'jwk', pubJwk, { name: 'ECDH', namedCurve: 'P-256' }, false, []
+      );
+      const shared = await crypto.subtle.deriveKey(
+        { name: 'ECDH', public: theirKey },
+        myPrivateKey,
+        { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+      );
+      sharedKeyCache[otherUserId] = shared;
+      return shared;
+    } catch (e) {
+      console.error('getSharedKey failed', e);
+      return null;
+    }
+  }
+
+  async function encryptText(text, sharedKey) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const enc = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, sharedKey, new TextEncoder().encode(text));
+    return {
+      iv:   btoa(String.fromCharCode(...iv)),
+      data: btoa(String.fromCharCode(...new Uint8Array(enc)))
+    };
+  }
+
+  async function decryptText(obj, sharedKey) {
+    try {
+      const iv   = Uint8Array.from(atob(obj.iv),   c => c.charCodeAt(0));
+      const data = Uint8Array.from(atob(obj.data), c => c.charCodeAt(0));
+      const dec  = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, sharedKey, data);
+      return new TextDecoder().decode(dec);
+    } catch {
+      return null; // Decryption failed (different device / missing key)
+    }
   }
 
   async function registerPushNotifications() {
@@ -316,10 +393,11 @@
         }
       });
 
-      contacts = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter(u => u.id !== currentUser.id);
-      
+      const allUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const me = allUsers.find(u => u.id === currentUser.id);
+      const friendIds = me?.friendIds || [];
+
+      contacts = allUsers.filter(u => u.id !== currentUser.id && friendIds.includes(u.id));
       onlineUsers = new Set(contacts.filter(u => u.online).map(u => u.id));
       renderContacts();
       updateChatStatus();
@@ -444,40 +522,69 @@
     });
   }
 
-  function renderMessages(messages) {
+  async function renderMessages(messages) {
     let html = '';
     let lastDate = '';
-    messages.forEach(msg => {
+    for (const msg of messages) {
       const msgDate = msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleDateString() : 'Pending';
       if (msgDate !== lastDate) {
         lastDate = msgDate;
         html += `<div class="message-date-divider"><span>${msgDate}</span></div>`;
       }
       const isSent = msg.fromUserId === currentUser.id;
-      const contentHtml = msg.type === 'voice' 
-        ? `<div class="voice-message"><audio src="${msg.audioData || msg.audioUrl}" controls></audio></div>`
-        : `<div class="message-content">${escapeHtml(msg.content)}</div>`;
+      const otherId = isSent ? msg.toUserId : msg.fromUserId;
+
+      // Decrypt if encrypted
+      let displayContent = msg.content;
+      let displayAudio   = msg.audioData || msg.audioUrl;
+
+      if (msg.encrypted) {
+        const key = await getSharedKey(otherId);
+        if (key) {
+          if (msg.type === 'text' && typeof msg.content === 'object') {
+            displayContent = await decryptText(msg.content, key) || '🔒 [Encrypted]';
+          }
+          if (msg.type === 'voice' && typeof msg.audioData === 'object') {
+            displayAudio = await decryptText(msg.audioData, key) || null;
+          }
+        } else {
+          displayContent = '🔒 [Encrypted — open on original device]';
+        }
+      }
+
+      const contentHtml = msg.type === 'voice'
+        ? (displayAudio ? `<div class="voice-message"><audio src="${displayAudio}" controls></audio></div>` : `<div class="message-content">🎤 Voice message</div>`)
+        : `<div class="message-content">${escapeHtml(displayContent)}</div>`;
+
       html += `
         <div class="message ${isSent ? 'sent' : 'received'}">
           ${contentHtml}
           <div class="message-time">${formatTime(msg.createdAt)}${isSent ? (msg.read ? ' ✓✓' : ' ✓') : ''}</div>
         </div>`;
-    });
+    }
     messagesList.innerHTML = html || '<div style="text-align:center;padding:40px;opacity:0.5">No messages yet</div>';
   }
 
-  function sendMessage() {
+  async function sendMessage() {
     const content = messageInput.value.trim();
     if (!content || !activeChat) return;
 
     const chatId = [currentUser.id, activeChat.id].sort().join('_');
-    firestore.collection('messages').add({
-      chatId, fromUserId: currentUser.id, toUserId: activeChat.id,
-      content, type: 'text', read: false,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    
-    triggerPushNotification(activeChat.id, `New message from ${currentUser.displayName}`, content.slice(0, 50));
+    const sharedKey = await getSharedKey(activeChat.id);
+
+    let payload;
+    if (sharedKey) {
+      payload = { chatId, fromUserId: currentUser.id, toUserId: activeChat.id,
+        content: await encryptText(content, sharedKey), type: 'text', encrypted: true, read: false,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+    } else {
+      payload = { chatId, fromUserId: currentUser.id, toUserId: activeChat.id,
+        content, type: 'text', read: false,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+    }
+
+    firestore.collection('messages').add(payload);
+    triggerPushNotification(activeChat.id, `New message from ${currentUser.displayName}`, '💬 New message');
 
     messageInput.value = '';
     messageInput.style.height = '';
@@ -575,15 +682,77 @@
     }
   }
 
-  function sendVoiceMessage(audioData) {
+  async function sendVoiceMessage(audioData) {
     const chatId = [currentUser.id, activeChat.id].sort().join('_');
-    firestore.collection('messages').add({
-      chatId, fromUserId: currentUser.id, toUserId: activeChat.id,
-      content: 'Voice message', type: 'voice', audioData, read: false,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    const sharedKey = await getSharedKey(activeChat.id);
+
+    let payload;
+    if (sharedKey) {
+      payload = { chatId, fromUserId: currentUser.id, toUserId: activeChat.id,
+        content: 'Voice message', type: 'voice',
+        audioData: await encryptText(audioData, sharedKey),
+        encrypted: true, read: false,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+    } else {
+      payload = { chatId, fromUserId: currentUser.id, toUserId: activeChat.id,
+        content: 'Voice message', type: 'voice', audioData, read: false,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+    }
+
+    firestore.collection('messages').add(payload);
     triggerPushNotification(activeChat.id, `New voice message from ${currentUser.displayName}`, '🎤 Voice message');
     scrollToBottom();
+  }
+
+  // ─── Add Contact Logic ────────────────────────────────
+
+  const addContactModal  = document.getElementById('add-contact-modal');
+  const addContactInput  = document.getElementById('add-contact-input');
+  const addContactError  = document.getElementById('add-contact-error');
+  const addContactSubmit = document.getElementById('add-contact-submit');
+  const addContactCancel = document.getElementById('add-contact-cancel');
+
+  document.getElementById('add-contact-btn').addEventListener('click', () => {
+    addContactInput.value = '';
+    addContactError.style.display = 'none';
+    addContactModal.style.display = 'flex';
+    addContactInput.focus();
+  });
+
+  addContactCancel.addEventListener('click', () => { addContactModal.style.display = 'none'; });
+  addContactModal.addEventListener('click', (e) => { if (e.target === addContactModal) addContactModal.style.display = 'none'; });
+
+  addContactSubmit.addEventListener('click', addContact);
+  addContactInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addContact(); });
+
+  async function addContact() {
+    const username = addContactInput.value.trim().toLowerCase();
+    if (!username) return;
+    addContactSubmit.textContent = 'Adding...';
+    addContactError.style.display = 'none';
+    try {
+      const snap = await firestore.collection('users').where('username', '==', username).get();
+      if (snap.empty) throw new Error('User not found');
+      const friendDoc = snap.docs[0];
+      const friendId = friendDoc.id;
+      if (friendId === currentUser.id) throw new Error("You can't add yourself");
+
+      // Mutual connection
+      await firestore.collection('users').doc(currentUser.id).update({
+        friendIds: firebase.firestore.FieldValue.arrayUnion(friendId)
+      });
+      await firestore.collection('users').doc(friendId).update({
+        friendIds: firebase.firestore.FieldValue.arrayUnion(currentUser.id)
+      });
+
+      addContactModal.style.display = 'none';
+      alert(`✅ ${friendDoc.data().displayName} added! They can now see you too.`);
+    } catch (e) {
+      addContactError.textContent = e.message;
+      addContactError.style.display = 'block';
+    } finally {
+      addContactSubmit.textContent = 'Add';
+    }
   }
 
   function updateChatStatus() {
