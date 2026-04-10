@@ -378,8 +378,16 @@
 
   // ─── Signaling & Calls ────────────────────────────────
 
+  // ─── Signaling & Calls ────────────────────────────────
+
+  function logCall(msg, data = {}) {
+    const time = new Date().toLocaleTimeString();
+    console.log(`%c[Call ${time}] ${msg}`, 'color: #8b5cf6; font-weight: bold;', data);
+  }
+
   function startCall(type) {
     if (!activeChat) return;
+    logCall('Starting call...', { type, toUser: activeChat.displayName });
     
     currentCall = { userId: activeChat.id, type };
     
@@ -397,6 +405,9 @@
       callType: type,
       status: 'ringing',
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(doc => {
+      currentCall.id = doc.id;
+      logCall('Signaling doc created', { id: doc.id });
     });
   }
 
@@ -404,24 +415,46 @@
   $('#voice-call-btn').addEventListener('click', () => startCall('voice'));
 
   async function handleSignaling(data, doc) {
+    logCall('Signaling change detected', { type: data.type, status: data.status });
+
+    // 1. Incoming Call Request
     if (data.type === 'call-request' && data.status === 'ringing') {
+      if (currentCall) return; // Busy
+      logCall('Incoming call request', data);
       currentCall = { id: doc.id, userId: data.fromUserId, type: data.callType };
       showIncomingCall(contacts.find(c => c.id === data.fromUserId), data.callType);
     } 
+    // 2. Call Accepted by Callee (Caller receives this)
     else if (data.type === 'call-request' && data.status === 'accepted' && data.fromUserId === currentUser.id) {
       if (currentCall && !callTimerInterval) {
-        // Call accepted by other party, start WebRTC
+        logCall('Call accepted by other party', data);
         $('#call-status').textContent = 'Connecting...';
         createPeerConnection(true);
       }
     }
+    // 3. WebRTC Negotiation
+    else if (data.type === 'webrtc-offer' && data.toUserId === currentUser.id) {
+      logCall('WebRTC Offer received');
+      handleWebRTCOffer(data, doc);
+    }
+    else if (data.type === 'webrtc-answer' && data.toUserId === currentUser.id) {
+      logCall('WebRTC Answer received');
+      handleWebRTCAnswer(data);
+    }
+    else if (data.type === 'ice-candidate' && data.toUserId === currentUser.id) {
+      logCall('ICE Candidate received');
+      handleICECandidate(data);
+    }
+    // 4. Call Terminated
     else if (data.type === 'call-request' && data.status === 'rejected') {
+      logCall('Call rejected');
       endCall();
     }
   }
 
   function showIncomingCall(caller, type) {
     if (!caller) return;
+    logCall('Showing incoming call UI', { caller: caller.displayName });
     incomingCallModal.classList.remove('hidden');
     $('#incoming-name').textContent = caller.displayName;
     setAvatarEl($('#incoming-avatar'), caller);
@@ -429,10 +462,10 @@
   }
 
   $('#accept-call-btn').addEventListener('click', () => {
+    logCall('Accepting incoming call');
     incomingCallModal.classList.add('hidden');
     stopRingtone();
     
-    // Show overlay
     callOverlay.classList.remove('hidden');
     const caller = contacts.find(c => c.id === currentCall.userId);
     if (caller) {
@@ -441,7 +474,6 @@
     }
     $('#call-status').textContent = 'Connecting...';
 
-    // Update signaling doc
     firestore.collection('signaling').doc(currentCall.id).update({
       status: 'accepted'
     });
@@ -450,33 +482,120 @@
   });
 
   $('#reject-call-btn').addEventListener('click', () => {
+    logCall('Rejecting incoming call');
     incomingCallModal.classList.add('hidden');
     stopRingtone();
     if (currentCall?.id) {
-      firestore.collection('signaling').doc(currentCall.id).update({
-        status: 'rejected'
-      });
+      firestore.collection('signaling').doc(currentCall.id).update({ status: 'rejected' });
     }
     currentCall = null;
   });
 
-  // ─── WebRTC Logic (Simpler version for Firestore) ───
+  // ─── WebRTC Implementation ────────────────────────────
+  
+  const ICE_SERVERS = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
   async function createPeerConnection(isInitiator) {
-    // Note: Full WebRTC through Firestore requires syncing ICE/SDP.
-    // For now, let's just show the UI state.
-    $('#call-status').textContent = 'Connected (Simulated)';
-    startCallTimer();
+    logCall('Creating PeerConnection', { isInitiator });
+    peerConnection = new RTCPeerConnection(ICE_SERVERS);
+
+    try {
+      const constraints = {
+        audio: true,
+        video: currentCall.type === 'video'
+      };
+      logCall('Requesting media devices', constraints);
+      localStream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      if (currentCall.type === 'video') {
+        $('#local-video').srcObject = localStream;
+        $('#local-video').style.display = 'block';
+      }
+
+      localStream.getTracks().forEach(track => {
+        logCall(`Adding ${track.kind} track to PC`);
+        peerConnection.addTrack(track, localStream);
+      });
+    } catch (err) {
+      logCall('Media error', err);
+      $('#call-status').textContent = 'Camera/Mic error';
+      return;
+    }
+
+    peerConnection.ontrack = (event) => {
+      logCall('Remote track received');
+      $('#remote-video').srcObject = event.streams[0];
+      $('#remote-video').style.display = 'block';
+      $('#call-avatar-display').classList.add('hidden');
+      $('#call-status').textContent = 'Connected';
+      startCallTimer();
+    };
+
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        logCall('New ICE candidate');
+        firestore.collection('signaling').add({
+          fromUserId: currentUser.id,
+          toUserId: currentCall.userId,
+          type: 'ice-candidate',
+          candidate: event.candidate.toJSON(),
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+    };
+
+    if (isInitiator) {
+      logCall('Creating WebRTC Offer');
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      firestore.collection('signaling').add({
+        fromUserId: currentUser.id,
+        toUserId: currentCall.userId,
+        type: 'webrtc-offer',
+        sdp: offer.sdp,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+  }
+
+  async function handleWebRTCOffer(data, doc) {
+    if (peerConnection.signalingState !== 'stable') return;
+    logCall('Handling WebRTC Offer');
+    await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: data.sdp }));
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+    firestore.collection('signaling').add({
+      fromUserId: currentUser.id,
+      toUserId: currentCall.userId,
+      type: 'webrtc-answer',
+      sdp: answer.sdp,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+
+  async function handleWebRTCAnswer(data) {
+    logCall('Handling WebRTC Answer');
+    await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: data.sdp }));
+  }
+
+  async function handleICECandidate(data) {
+    if (peerConnection) {
+      logCall('Handling ICE Candidate');
+      await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+    }
   }
 
   $('#end-call-btn').addEventListener('click', () => {
-    if (currentCall?.id) {
-      firestore.collection('signaling').doc(currentCall.id).delete();
-    }
+    logCall('Ending call manually');
+    if (currentCall?.id) firestore.collection('signaling').doc(currentCall.id).delete();
     endCall();
   });
 
   function endCall() {
+    logCall('Terminating call session');
     if (callTimerInterval) { clearInterval(callTimerInterval); callTimerInterval = null; }
+    if (peerConnection) { peerConnection.close(); peerConnection = null; }
+    if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
     callOverlay.classList.add('hidden');
     incomingCallModal.classList.add('hidden');
     currentCall = null;
@@ -484,13 +603,10 @@
   }
 
   function playRingtone() { 
+    logCall('Playing ringtone');
     try {
-      if (!ringtoneContext) {
-        ringtoneContext = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      if (ringtoneContext.state === 'suspended') {
-        ringtoneContext.resume();
-      }
+      if (!ringtoneContext) ringtoneContext = new (window.AudioContext || window.webkitAudioContext)();
+      if (ringtoneContext.state === 'suspended') ringtoneContext.resume();
       const beep = () => {
         const osc = ringtoneContext.createOscillator();
         const gain = ringtoneContext.createGain();
@@ -498,12 +614,12 @@
         osc.frequency.value = 440; gain.gain.value = 0.1;
         osc.start(); osc.stop(ringtoneContext.currentTime + 0.5);
       };
-      beep();
-      ringtoneInterval = setInterval(beep, 1500);
+      beep(); ringtoneInterval = setInterval(beep, 1500);
     } catch(e) {}
   }
 
   function stopRingtone() {
+    logCall('Stopping ringtone');
     if (ringtoneInterval) clearInterval(ringtoneInterval);
     if (ringtoneContext) ringtoneContext.close();
     ringtoneInterval = null; ringtoneContext = null;
@@ -511,6 +627,7 @@
 
   let callTimerInterval = null;
   function startCallTimer() {
+    logCall('Starting call timer');
     const start = Date.now();
     callTimerInterval = setInterval(() => {
       const elapsed = Math.floor((Date.now() - start) / 1000);
@@ -522,10 +639,8 @@
 
   function showNotification(msg) {
     const sender = contacts.find(c => c.id === msg.fromUserId);
-    if (!sender || !('Notification' in window)) return;
-    if (Notification.permission === 'granted') {
-      new Notification(sender.displayName, { body: msg.content.slice(0, 50) });
-    }
+    if (!sender) return;
+    if (Notification.permission === 'granted') new Notification(sender.displayName, { body: msg.content.slice(0, 50) });
   }
 
   function scrollToBottom() { messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' }); }
