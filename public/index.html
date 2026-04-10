@@ -46,10 +46,6 @@
           <label for="login-username">Username</label>
           <input type="text" id="login-username" name="fl_user" placeholder="Enter your username" autocomplete="off" required>
         </div>
-        <div class="form-group">
-          <label for="login-pin">PIN Code</label>
-          <input type="password" id="login-pin" name="fl_pin" placeholder="Enter your PIN" inputmode="numeric" autocomplete="off" required>
-        </div>
         <button type="submit" class="btn btn-primary" id="login-btn">Sign In</button>
         <p class="auth-switch">Don't have an account? <a href="#" id="show-register">Create one</a></p>
         <div id="login-error" class="form-error hidden"></div>
@@ -64,10 +60,6 @@
         <div class="form-group">
           <label for="reg-displayname">Display Name</label>
           <input type="text" id="reg-displayname" name="fl_reg_name" placeholder="Your name (shown to family)" autocomplete="off" required>
-        </div>
-        <div class="form-group">
-          <label for="reg-pin">PIN Code</label>
-          <input type="password" id="reg-pin" name="fl_reg_pin" placeholder="Choose a 4+ digit PIN" inputmode="numeric" minlength="4" autocomplete="off" required>
         </div>
         <button type="submit" class="btn btn-primary" id="register-btn">Create Account</button>
         <p class="auth-switch">Already have an account? <a href="#" id="show-login">Sign in</a></p>
@@ -243,7 +235,9 @@
     </div>
   </div>
 
-  <script src="/socket.io/socket.io.js"></script>
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>
