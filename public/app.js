@@ -651,6 +651,7 @@
       });
 
       $('#call-avatar-display').classList.add('hidden');
+      callOverlay.classList.add('connected');
       $('#call-status').textContent = 'Connected';
       startCallTimer();
     };
@@ -746,6 +747,7 @@
     $('#toggle-mute').classList.remove('active');
     $('#toggle-camera').classList.remove('active');
     
+    callOverlay.classList.remove('connected');
     callOverlay.classList.add('hidden');
     incomingCallModal.classList.add('hidden');
     currentCall = null;
