@@ -214,12 +214,51 @@
     authScreen.classList.remove('active');
     authScreen.style.display = 'none';
     chatScreen.style.display = '';
+
+    if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      Notification.requestPermission();
+    }
     chatScreen.classList.add('active');
 
     setAvatarEl($('#sidebar-avatar'), currentUser);
     $('#sidebar-username').textContent = currentUser.displayName;
 
     connectMessaging();
+    registerPushNotifications();
+  }
+
+  async function registerPushNotifications() {
+    try {
+      const messaging = firebase.messaging();
+      const token = await messaging.getToken({ vapidKey: 'BM5f-Qg5EvdAjaTSKv2POqEQsKqDrdk5F0J_5ttPCVMX2ABflim5KMmz2-hKopILH9fR52hlClPpeFRhE3qYPnc' });
+      if (token && currentUser) {
+        console.log('FCM Token obtained');
+        await firestore.collection('users').doc(currentUser.id).update({ fcmToken: token });
+      }
+      messaging.onMessage((payload) => {
+        console.log('Foreground push received:', payload);
+        // Let the existing onSnapshot handlers handle the foreground UI updates
+      });
+    } catch (e) {
+      console.error('Failed to configure Push Notifications', e);
+    }
+  }
+
+  async function triggerPushNotification(targetUserId, title, body) {
+    try {
+      const userDoc = await firestore.collection('users').doc(targetUserId).get();
+      if (!userDoc.exists) return;
+      const targetToken = userDoc.data().fcmToken;
+      if (!targetToken) return;
+
+      await fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: targetToken, title, body })
+      });
+    } catch (e) {
+      console.error('Failed to trigger push notification:', e);
+    }
   }
 
   function connectMessaging() {
@@ -387,6 +426,8 @@
       content, type: 'text', read: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
+    
+    triggerPushNotification(activeChat.id, `New message from ${currentUser.displayName}`, content.slice(0, 50));
 
     messageInput.value = '';
     messageInput.style.height = '';
@@ -487,7 +528,9 @@
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     }).then(doc => {
       currentCall.id = doc.id;
-      logCall('Signaling doc created', { id: doc.id });
+      triggerPushNotification(activeChat.id, `Incoming ${type} call`, `${currentUser.displayName} is calling you!`);
+    }).catch(e => {
+      logCall('Failed to start call', e);
     });
   }
 
@@ -563,6 +606,10 @@
     $('#incoming-name').textContent = caller.displayName;
     setAvatarEl($('#incoming-avatar'), caller);
     playRingtone();
+    
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(`Incoming ${type} call`, { body: `${caller.displayName} is calling you!` });
+    }
   }
 
     $('#accept-call-btn').addEventListener('click', async () => {
