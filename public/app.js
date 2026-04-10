@@ -33,6 +33,7 @@
   let messageUnsubscribe = null;
   let ringtoneInterval = null;
   let ringtoneContext = null;
+  let callStartTime = null;
 
   // ─── DOM Elements ─────────────────────────────────────
 
@@ -248,7 +249,13 @@
       .where('toUserId', '==', currentUser.id)
       .onSnapshot((snapshot) => {
         snapshot.docChanges().forEach(change => {
-          if (change.type === 'added') handleSignaling(change.doc.data(), change.doc);
+          if (change.type === 'added') {
+            const data = change.doc.data();
+            const created = data.createdAt?.toMillis ? data.createdAt.toMillis() : 0;
+            // Ignore signals older than current session
+            if (created < callStartTime - 5000) return; 
+            handleSignaling(data, change.doc);
+          }
           if (change.type === 'removed' && currentCall) {
             logCall('Incoming signaling doc removed');
             endCall();
@@ -260,7 +267,12 @@
       .where('fromUserId', '==', currentUser.id)
       .onSnapshot((snapshot) => {
         snapshot.docChanges().forEach(change => {
-          if (change.type === 'modified') handleSignaling(change.doc.data(), change.doc);
+          if (change.type === 'modified' || change.type === 'added') {
+            const data = change.doc.data();
+            const created = data.createdAt?.toMillis ? data.createdAt.toMillis() : 0;
+            if (created < callStartTime - 5000) return;
+            handleSignaling(data, change.doc);
+          }
           if (change.type === 'removed' && currentCall) {
             logCall('Outgoing signaling doc removed');
             endCall();
@@ -397,6 +409,7 @@
     logCall('Starting call...', { type, toUser: activeChat.displayName });
     
     currentCall = { userId: activeChat.id, type };
+    callStartTime = Date.now();
     
     // Show call overlay
     callOverlay.classList.remove('hidden');
@@ -428,6 +441,7 @@
     if (data.type === 'call-request' && data.status === 'ringing') {
       if (currentCall) return; // Busy
       logCall('Incoming call request', data);
+      callStartTime = data.createdAt?.toMillis ? data.createdAt.toMillis() : Date.now();
       currentCall = { id: doc.id, userId: data.fromUserId, type: data.callType };
       showIncomingCall(contacts.find(c => c.id === data.fromUserId), data.callType);
     } 
@@ -581,6 +595,7 @@
   }
 
   async function handleWebRTCAnswer(data) {
+    if (!peerConnection) return;
     logCall('Handling WebRTC Answer');
     await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: data.sdp }));
   }
