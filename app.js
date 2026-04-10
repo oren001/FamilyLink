@@ -607,7 +607,7 @@
         urls: [
           "turn:openrelay.metered.ca:80?transport=udp",
           "turn:openrelay.metered.ca:80?transport=tcp",
-          "turn:openrelay.metered.ca:443?transport=tls"
+          "turns:openrelay.metered.ca:443?transport=tcp"
         ],
         username: "openrelayproject",
         credential: "openrelayproject"
