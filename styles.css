@@ -274,7 +274,7 @@ a:hover {
 
 #chat-screen {
   flex-direction: row;
-  height: 100vh;
+  height: 100dvh;
 }
 
 /* ─── Sidebar ─────────────────────────────────────────── */
@@ -286,7 +286,7 @@ a:hover {
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100dvh;
 }
 
 .sidebar-header {

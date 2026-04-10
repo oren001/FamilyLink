@@ -39,6 +39,7 @@
   let isMuted = false;
   let isCameraOff = false;
   let localStream = null;
+  let currentFacingMode = 'user';
   let messageUnsubscribe = null;
   let ringtoneInterval = null;
   let ringtoneContext = null;
@@ -538,7 +539,7 @@
     try {
       const constraints = {
         audio: true,
-        video: type === 'video'
+        video: type === 'video' ? { facingMode: currentFacingMode } : false
       };
       logCall('Requesting local media', constraints);
       localStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -559,6 +560,59 @@
 
   $('#video-call-btn').addEventListener('click', () => startCall('video'));
   $('#voice-call-btn').addEventListener('click', () => startCall('voice'));
+
+  $('#flip-camera').addEventListener('click', async () => {
+    if (!localStream || !currentCall || currentCall.type !== 'video') return;
+    
+    currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+    logCall('Flipping camera to', currentFacingMode);
+    $('#flip-camera').style.transform = currentFacingMode === 'environment' ? 'rotate(180deg)' : 'rotate(0deg)';
+    $('#flip-camera').style.transition = 'transform 0.3s ease';
+
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { exact: currentFacingMode } },
+        audio: true
+      }).catch(e => {
+        // Fallback for devices that don't support "exact" constraint gracefully
+        return navigator.mediaDevices.getUserMedia({
+          video: { facingMode: currentFacingMode },
+          audio: true
+        });
+      });
+
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      const newAudioTrack = newStream.getAudioTracks()[0];
+
+      if (peerConnection) {
+        const senders = peerConnection.getSenders();
+        const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+        if (videoSender) videoSender.replaceTrack(newVideoTrack);
+        
+        const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
+        if (audioSender) audioSender.replaceTrack(newAudioTrack);
+      }
+
+      // Stop old tracks to release camera hardware
+      localStream.getTracks().forEach(t => t.stop());
+      localStream = newStream;
+      
+      const localVideo = $('#local-video');
+      localVideo.srcObject = localStream;
+      localVideo.muted = true;
+      localVideo.play().catch(e => logCall('Local video play failed on flip', e));
+
+      // Restore mute/camera states
+      if (isMuted) localStream.getAudioTracks().forEach(t => t.enabled = false);
+      if (isCameraOff) localStream.getVideoTracks().forEach(t => t.enabled = false);
+      
+      logCall('Camera flip successful');
+    } catch (err) {
+      logCall('Failed to flip camera', err);
+      // Revert state if failed
+      currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+    }
+  });
 
   async function handleSignaling(data, doc) {
     logCall('Signaling change detected', { type: data.type, status: data.status });
