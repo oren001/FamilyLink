@@ -8,7 +8,7 @@
   // ─── PWA Service Worker ──────────────────────────────
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/service-worker.js')
+      navigator.serviceWorker.register('service-worker.js')
         .then(reg => console.log('ServiceWorker registered'))
         .catch(err => console.log('ServiceWorker failed', err));
     });
@@ -597,7 +597,21 @@
 
   // ─── WebRTC Implementation ────────────────────────────
   
-  const ICE_SERVERS = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+  const ICE_SERVERS = { 
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      {
+        urls: [
+          "turn:openrelay.metered.ca:80?transport=udp",
+          "turn:openrelay.metered.ca:80?transport=tcp",
+          "turn:openrelay.metered.ca:443?transport=tls"
+        ],
+        username: "openrelayproject",
+        credential: "openrelayproject"
+      }
+    ] 
+  };
+
 
   async function createPeerConnection(isInitiator) {
     logCall('Creating PeerConnection', { isInitiator });
