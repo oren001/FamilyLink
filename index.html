@@ -264,12 +264,19 @@
   </div>
 
   <!-- Global Version Tag -->
-  <div class="global-version-tag">v1.3.2</div>
+  <div class="global-version-tag">v1.3.3</div>
 
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>`n  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+
+  <!-- Voice Recording Indicator -->
+  <div id="recording-indicator" style="display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:rgba(251,113,133,0.95); color:#fff; padding:10px 20px; border-radius:30px; font-size:14px; font-weight:600; z-index:9999; align-items:center; gap:8px; box-shadow:0 4px 20px rgba(251,113,133,0.5);">
+    <span style="width:10px;height:10px;border-radius:50%;background:#fff;display:inline-block;animation:pulseMic 1s infinite;"></span>
+    Recording... <span id="rec-timer">0s</span> — release to send
+  </div>
   <script src="app.js"></script>
 </body>
 </html>
