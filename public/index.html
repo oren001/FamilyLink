@@ -54,6 +54,10 @@
         </div>
         <button type="submit" class="btn btn-primary" id="auth-btn">Continue</button>
         <div id="auth-error" class="form-error hidden"></div>
+        <div style="margin-top:20px; text-align:center; font-size:12px; color:var(--text-muted); display:flex; align-items:center; justify-content:center; gap:6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          End-to-End Encrypted
+        </div>
       </form>
     </div>
   </div>
@@ -119,6 +123,13 @@
         </div>
         <h2>Welcome to FamilyLink</h2>
         <p>Select a contact to start chatting</p>
+        <div style="margin-top:24px; padding:12px 20px; background:var(--bg-tertiary); border-radius:12px; font-size:13px; color:var(--text-secondary); display:flex; align-items:center; gap:10px; border:1px solid var(--border-color);">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          <div style="text-align:left;">
+            <strong style="color:var(--text-primary); display:block; margin-bottom:2px;">End-to-End Encrypted</strong>
+            Calls, messages, and voice notes are secured. Nobody else can intercept or listen in.
+          </div>
+        </div>
       </div>
 
       <!-- Active chat -->
@@ -133,7 +144,13 @@
           <div class="avatar" id="chat-avatar"></div>
           <div class="chat-header-info">
             <h3 id="chat-name"></h3>
-            <span id="chat-status" class="status-text">offline</span>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span id="chat-status" class="status-text">offline</span>
+              <span style="font-size:11px; color:#10b981; display:flex; align-items:center; gap:3px;">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                E2EE
+              </span>
+            </div>
           </div>
           <div class="chat-header-actions">
             <button class="icon-btn" id="voice-call-btn" title="Voice Call">
@@ -255,7 +272,7 @@
   </div>
 
   <!-- Global Version Tag -->
-  <div class="global-version-tag">v1.4.1</div>
+  <div class="global-version-tag">v1.4.2</div>
 
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
