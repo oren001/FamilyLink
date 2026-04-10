@@ -139,63 +139,80 @@
 
   // ─── Auth ─────────────────────────────────────────────
 
-  // Check saved session
-  try {
-    const saved = localStorage.getItem('familylink_user');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed && parsed.id) {
-        currentUser = parsed;
-        initChat();
-      }
+  async function processAuth(displayName, inviteId = null) {
+    const username = displayName.toLowerCase().replace(/\s+/g, '');
+    const snapshot = await firestore.collection('users').where('username', '==', username).get();
+      
+    if (!snapshot.empty) {
+      // Login
+      const userData = snapshot.docs[0].data();
+      currentUser = { id: snapshot.docs[0].id, username: userData.username, displayName: userData.displayName };
+    } else {
+      // Register
+      const docRef = await firestore.collection('users').add({
+        username, displayName,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        online: true
+      });
+      currentUser = { id: docRef.id, username, displayName };
+      
+      const allUsers = await firestore.collection('users').get();
+      allUsers.docs.forEach(d => {
+        const u = d.data();
+        if (d.id !== docRef.id && u.fcmToken) {
+          fetch('/api/notify', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: u.fcmToken, title: "New Family Member 🎉", body: `${displayName} just joined FamilyLink!` })
+          });
+        }
+      });
     }
-  } catch (e) {}
 
-  // Auth Logic (Login / Register combined)
+    if (inviteId && currentUser.id !== inviteId) {
+      await firestore.collection('users').doc(currentUser.id).update({
+        friendIds: firebase.firestore.FieldValue.arrayUnion(inviteId)
+      });
+      await firestore.collection('users').doc(inviteId).update({
+        friendIds: firebase.firestore.FieldValue.arrayUnion(currentUser.id)
+      });
+    }
+
+    localStorage.setItem('familylink_user', JSON.stringify(currentUser));
+    initChat();
+  }
+
+  // Handle Magic Invite Link
+  const urlParams = new URLSearchParams(window.location.search);
+  const inviteId = urlParams.get('i');
+  const inviteName = urlParams.get('n');
+
+  if (inviteId && inviteName) {
+    processAuth(inviteName, inviteId)
+      .then(() => { window.history.replaceState({}, document.title, window.location.pathname); })
+      .catch(e => console.error("Invite login failed", e));
+  } else {
+    // Check saved session
+    try {
+      const saved = localStorage.getItem('familylink_user');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.id) {
+          currentUser = parsed;
+          initChat();
+        }
+      }
+    } catch (e) {}
+  }
+
+  // Manual Auth
   authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     authError.classList.add('hidden');
     const displayName = $('#auth-name').value.trim();
     if (!displayName) return;
 
-    // Generate a simple username from the display name
-    const username = displayName.toLowerCase().replace(/\s+/g, '');
-
     try {
-      // Check if user exists
-      const snapshot = await firestore.collection('users').where('username', '==', username).get();
-      
-      if (!snapshot.empty) {
-        // User exists -> Login
-        const userData = snapshot.docs[0].data();
-        const userId = snapshot.docs[0].id;
-        currentUser = { id: userId, username: userData.username, displayName: userData.displayName };
-      } else {
-        // User doesn't exist -> Register
-        const docRef = await firestore.collection('users').add({
-          username, displayName,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-          online: true
-        });
-        currentUser = { id: docRef.id, username, displayName };
-        
-        // Push notification broadcast (optional, currently uses fcmToken from others)
-        const allUsers = await firestore.collection('users').get();
-        allUsers.docs.forEach(d => {
-          const u = d.data();
-          if (d.id !== docRef.id && u.fcmToken) {
-            fetch('/api/notify', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ token: u.fcmToken, title: "New Family Member 🎉", body: `${displayName} just joined FamilyLink!` })
-            });
-          }
-        });
-      }
-
-      // Save session & init
-      localStorage.setItem('familylink_user', JSON.stringify(currentUser));
-      initChat();
+      await processAuth(displayName);
     } catch (err) {
       console.error(err);
       authError.textContent = 'Something went wrong. Please try again.';
@@ -695,32 +712,18 @@
   addContactInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addContact(); });
 
   async function addContact() {
-    const username = addContactInput.value.trim().toLowerCase();
-    if (!username) return;
-    addContactSubmit.textContent = 'Adding...';
-    addContactError.style.display = 'none';
+    const invitedName = addContactInput.value.trim();
+    if (!invitedName) return;
+
+    const inviteUrl = `${window.location.origin}${window.location.pathname}?i=${currentUser.id}&n=${encodeURIComponent(invitedName)}`;
+    
     try {
-      const snap = await firestore.collection('users').where('username', '==', username).get();
-      if (snap.empty) throw new Error('User not found');
-      const friendDoc = snap.docs[0];
-      const friendId = friendDoc.id;
-      if (friendId === currentUser.id) throw new Error("You can't add yourself");
-
-      // Mutual connection
-      await firestore.collection('users').doc(currentUser.id).update({
-        friendIds: firebase.firestore.FieldValue.arrayUnion(friendId)
-      });
-      await firestore.collection('users').doc(friendId).update({
-        friendIds: firebase.firestore.FieldValue.arrayUnion(currentUser.id)
-      });
-
+      await navigator.clipboard.writeText(inviteUrl);
       addContactModal.style.display = 'none';
-      alert(`✅ ${friendDoc.data().displayName} added! They can now see you too.`);
+      alert(`Invite link for ${invitedName} copied to clipboard!\n\nSend this link to them. When they open it, they'll instantly be logged in and connected to you.`);
     } catch (e) {
-      addContactError.textContent = e.message;
+      addContactError.textContent = 'Failed to copy link. Try again.';
       addContactError.style.display = 'block';
-    } finally {
-      addContactSubmit.textContent = 'Add';
     }
   }
 
