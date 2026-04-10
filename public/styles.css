@@ -1098,12 +1098,21 @@ a:hover {
 }
 
 /* Version Labeling */
-.version-tag {
-  text-align: center;
+.global-version-tag {
+  position: fixed;
+  bottom: env(safe-area-inset-bottom, 12px);
+  left: env(safe-area-inset-left, 12px);
+  z-index: 10000;
   font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 24px;
-  opacity: 0.5;
+  font-family: inherit;
+  font-weight: 500;
+  color: var(--text-color);
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  padding: 2px 6px;
+  border-radius: 4px;
+  opacity: 0.7;
+  pointer-events: none;
 }
 
 .sidebar-footer {
