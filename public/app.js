@@ -31,6 +31,8 @@
   let isMuted = false;
   let isCameraOff = false;
   let messageUnsubscribe = null;
+  let ringtoneInterval = null;
+  let ringtoneContext = null;
 
   // ─── DOM Elements ─────────────────────────────────────
 
@@ -249,6 +251,15 @@
           if (change.type === 'added') handleSignaling(change.doc.data(), change.doc);
         });
       });
+
+    firestore.collection('signaling')
+      .where('fromUserId', '==', currentUser.id)
+      .onSnapshot((snapshot) => {
+        snapshot.docChanges().forEach(change => {
+          if (change.type === 'modified') handleSignaling(change.doc.data(), change.doc);
+          if (change.type === 'removed') endCall();
+        });
+      });
   }
 
   function renderContacts(filter = '') {
@@ -398,9 +409,11 @@
       showIncomingCall(contacts.find(c => c.id === data.fromUserId), data.callType);
     } 
     else if (data.type === 'call-request' && data.status === 'accepted' && data.fromUserId === currentUser.id) {
-      // Call accepted, start WebRTC
-      $('#call-status').textContent = 'Connecting...';
-      createPeerConnection(true);
+      if (currentCall && !callTimerInterval) {
+        // Call accepted by other party, start WebRTC
+        $('#call-status').textContent = 'Connecting...';
+        createPeerConnection(true);
+      }
     }
     else if (data.type === 'call-request' && data.status === 'rejected') {
       endCall();
@@ -472,7 +485,12 @@
 
   function playRingtone() { 
     try {
-      ringtoneContext = new (window.AudioContext || window.webkitAudioContext)();
+      if (!ringtoneContext) {
+        ringtoneContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (ringtoneContext.state === 'suspended') {
+        ringtoneContext.resume();
+      }
       const beep = () => {
         const osc = ringtoneContext.createOscillator();
         const gain = ringtoneContext.createGain();
