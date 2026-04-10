@@ -14,6 +14,26 @@
     });
   }
 
+  // ─── PWA Install Prompt ──────────────────────────────
+  let deferredPrompt;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    const installBtn = document.querySelector('#pwa-install-btn');
+    if (installBtn) {
+      installBtn.classList.remove('hidden');
+      installBtn.addEventListener('click', async () => {
+        installBtn.classList.add('hidden');
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          console.log(`User response to install prompt: ${outcome}`);
+          deferredPrompt = null;
+        }
+      });
+    }
+  });
+
   // ─── Firebase Config ──────────────────────────────────
   const firebaseConfig = {
     apiKey: "AIzaSyCcnpQDPsQptHdZKHupXOZNqNbO1JOD1Ss",
