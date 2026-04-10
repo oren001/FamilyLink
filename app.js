@@ -297,10 +297,18 @@
     messagesList.innerHTML = '<div class="loading-spinner"></div>';
     
     const chatId = [currentUser.id, activeChat.id].sort().join('_');
-    const q = firestore.collection('messages').where('chatId', '==', chatId).orderBy('createdAt', 'asc');
+    const q = firestore.collection('messages').where('chatId', '==', chatId);
 
     messageUnsubscribe = q.onSnapshot((snapshot) => {
-      const messages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      let messages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Client-side sort to avoid composite index requirement
+      messages.sort((a, b) => {
+        const t1 = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt || 0);
+        const t2 = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt || 0);
+        return t1 - t2;
+      });
+
       renderMessages(messages);
       scrollToBottom();
       
