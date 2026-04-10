@@ -2,11 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#0f172a">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/logo.jpg">
   <title>FamilyLink — Private Messenger</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="description" content="Private, lightweight family messenger with text and video calling">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -68,6 +71,7 @@
         <p class="auth-switch">Already have an account? <a href="#" id="show-login">Sign in</a></p>
         <div id="register-error" class="form-error hidden"></div>
       </form>
+      <div class="version-tag">v1.0.4</div>
     </div>
   </div>
 
@@ -96,6 +100,9 @@
 
       <div class="contacts-list" id="contacts-list">
         <!-- Contacts will be rendered here -->
+      </div>
+      <div class="sidebar-footer">
+        <span class="version-text">FamilyLink v1.0.4</span>
       </div>
     </aside>
 

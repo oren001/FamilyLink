@@ -65,6 +65,7 @@ body {
   background: var(--bg-primary);
   color: var(--text-primary);
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -90,6 +91,9 @@ a:hover {
 .screen {
   display: none;
   height: 100vh;
+  height: 100dvh;
+  width: 100%;
+  overflow: hidden;
 }
 .screen.active {
   display: flex;
@@ -290,8 +294,9 @@ a:hover {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
+  padding-top: calc(16px + env(safe-area-inset-top));
   border-bottom: 1px solid var(--border-color);
-  height: var(--header-height);
+  height: calc(var(--header-height) + env(safe-area-inset-top));
 }
 
 .sidebar-user-info {
@@ -500,8 +505,13 @@ a:hover {
   padding: 0 20px;
   height: var(--header-height);
   min-height: var(--header-height);
+  height: calc(var(--header-height) + env(safe-area-inset-top));
+  min-height: calc(var(--header-height) + env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
+  z-index: 50;
+  position: relative;
 }
 
 .back-btn {
@@ -959,25 +969,30 @@ a:hover {
 }
 
 /* ═══════════ RESPONSIVE ═══════════ */
-
 @media (max-width: 768px) {
-  :root {
-    --sidebar-width: 100%;
-  }
-  
   .sidebar {
-    position: absolute;
-    z-index: 10;
     width: 100%;
-    transition: transform 0.3s ease;
+    z-index: 100;
   }
   
   .sidebar.collapsed {
-    transform: translateX(-100%);
+    display: none !important;
   }
   
   .back-btn {
     display: flex;
+  }
+  
+  .chat-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 200;
+  }
+
+  .messages-container {
+    padding-top: calc(var(--header-height) + env(safe-area-inset-top) + 10px);
   }
   
   .chat-area {
@@ -1080,4 +1095,27 @@ a:hover {
 
 @keyframes fadeOut {
   to { opacity: 0; transform: translateY(-20px); pointer-events: none; }
+}
+
+/* Version Labeling */
+.version-tag {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 24px;
+  opacity: 0.5;
+}
+
+.sidebar-footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.version-text {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  opacity: 0.6;
 }

@@ -35,10 +35,10 @@
   let onlineUsers = new Set();
   let typingTimeout = null;
   let peerConnection = null;
-  let localStream = null;
   let currentCall = null;
   let isMuted = false;
   let isCameraOff = false;
+  let localStream = null;
   let messageUnsubscribe = null;
   let ringtoneInterval = null;
   let ringtoneContext = null;
@@ -401,8 +401,11 @@
   function updateChatStatus() {
     if (!activeChat) return;
     const online = onlineUsers.has(activeChat.id);
-    chatStatus.textContent = online ? 'online' : 'offline';
+    chatStatus.textContent = online ? 'Online' : 'Offline';
     chatStatus.className = 'status-text' + (online ? ' online' : '');
+    
+    // Ensure the viewport is at the top to prevent hidden headers on some mobile browsers
+    if (window.innerWidth <= 768) window.scrollTo(0, 0);
   }
 
   // ─── Signaling & Calls ────────────────────────────────
@@ -467,6 +470,12 @@
     $('#call-name').textContent = activeChat.displayName;
     setAvatarEl($('#call-avatar'), activeChat);
     $('#call-status').textContent = 'Ringing...';
+    $('#call-avatar-display').classList.remove('hidden');
+    $('#remote-video').style.display = 'none';
+    $('#local-video').style.display = 'none';
+
+    // Start local media immediately so user sees themselves
+    initLocalMedia(type);
     
     // Send call request
     firestore.collection('signaling').add({
@@ -480,6 +489,29 @@
       currentCall.id = doc.id;
       logCall('Signaling doc created', { id: doc.id });
     });
+  }
+
+  async function initLocalMedia(type) {
+    try {
+      const constraints = {
+        audio: true,
+        video: type === 'video'
+      };
+      logCall('Requesting local media', constraints);
+      localStream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      if (type === 'video') {
+        const localVideo = $('#local-video');
+        localVideo.srcObject = localStream;
+        localVideo.style.display = 'block';
+        localVideo.muted = true;
+        localVideo.play().catch(e => logCall('Local video play failed', e));
+      }
+      return localStream;
+    } catch (err) {
+      logCall('Media error', err);
+      $('#call-status').textContent = 'Camera/Mic error';
+    }
   }
 
   $('#video-call-btn').addEventListener('click', () => startCall('video'));
@@ -572,20 +604,11 @@
     peerConnection = new RTCPeerConnection(ICE_SERVERS);
 
     try {
-      const constraints = {
-        audio: true,
-        video: currentCall.type === 'video'
-      };
-      logCall('Requesting media devices', constraints);
-      localStream = await navigator.mediaDevices.getUserMedia(constraints);
-      
-      if (currentCall.type === 'video') {
-        const localVideo = $('#local-video');
-        localVideo.srcObject = localStream;
-        localVideo.style.display = 'block';
-        localVideo.muted = true; // Essential for autoplay
-        localVideo.play().catch(e => logCall('Local video play failed', e));
+      if (!localStream) {
+        await initLocalMedia(currentCall.type);
       }
+      
+      if (!localStream) throw new Error('Failed to get local stream');
 
       localStream.getTracks().forEach(track => {
         logCall(`Adding ${track.kind} track to PC`);
@@ -695,12 +718,41 @@
     logCall('Terminating call session');
     if (callTimerInterval) { clearInterval(callTimerInterval); callTimerInterval = null; }
     if (peerConnection) { peerConnection.close(); peerConnection = null; }
-    if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+    if (localStream) { 
+      localStream.getTracks().forEach(t => t.stop()); 
+      localStream = null; 
+    }
+    
+    // Reset control states
+    isMuted = false;
+    isCameraOff = false;
+    $('#toggle-mute').classList.remove('active');
+    $('#toggle-camera').classList.remove('active');
+    
     callOverlay.classList.add('hidden');
     incomingCallModal.classList.add('hidden');
     currentCall = null;
     stopRingtone();
   }
+
+  // ─── Call Controls ────────────────────────────────────
+
+  $('#toggle-mute').addEventListener('click', () => {
+    if (!localStream) return;
+    isMuted = !isMuted;
+    localStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
+    $('#toggle-mute').classList.toggle('active', isMuted);
+    logCall(isMuted ? 'Muted' : 'Unmuted');
+  });
+
+  $('#toggle-camera').addEventListener('click', () => {
+    if (!localStream || currentCall?.type !== 'video') return;
+    isCameraOff = !isCameraOff;
+    localStream.getVideoTracks().forEach(track => track.enabled = !isCameraOff);
+    $('#toggle-camera').classList.toggle('active', isCameraOff);
+    $('#local-video').style.opacity = isCameraOff ? '0' : '1';
+    logCall(isCameraOff ? 'Camera Off' : 'Camera On');
+  });
 
   function playRingtone() { 
     logCall('Playing ringtone');
