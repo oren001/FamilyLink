@@ -492,6 +492,7 @@
   // ─── Voice Recording ──────────────────────────────────
   let mediaRecorder;
   let audioChunks = [];
+  let recTimerInterval;
   const micBtn = $('#mic-btn');
 
   micBtn.addEventListener('mousedown', startRecording);
@@ -505,40 +506,70 @@
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorder = new MediaRecorder(stream);
       audioChunks = [];
-      mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-      mediaRecorder.onstop = uploadRecording;
-      mediaRecorder.start();
+      mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+      mediaRecorder.start(100); // collect data every 100ms
+
       micBtn.classList.add('recording');
-      console.log('Recording started...');
+
+      // Show recording indicator with live timer
+      const indicator = document.getElementById('recording-indicator');
+      const timerEl = document.getElementById('rec-timer');
+      indicator.style.display = 'flex';
+      let secs = 0;
+      recTimerInterval = setInterval(() => {
+        secs++;
+        timerEl.textContent = secs + 's';
+      }, 1000);
+
     } catch (e) {
-      console.error("Recording error", e);
+      console.error('Recording error', e);
+      if (e.name === 'NotAllowedError') {
+        alert('Microphone access was denied. Please allow microphone permissions in your browser settings.');
+      } else {
+        alert('Could not start recording: ' + e.message);
+      }
     }
   }
 
   function stopRecording() {
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-      mediaRecorder.stop();
-      micBtn.classList.remove('recording');
-      mediaRecorder.stream.getTracks().forEach(t => t.stop());
-      console.log('Recording stopped.');
-    }
+    if (!mediaRecorder || mediaRecorder.state !== 'recording') return;
+
+    // Hide indicator
+    document.getElementById('recording-indicator').style.display = 'none';
+    clearInterval(recTimerInterval);
+
+    micBtn.classList.remove('recording');
+
+    // Use a Promise to wait for onstop before uploading
+    const stopped = new Promise(resolve => { mediaRecorder.onstop = resolve; });
+    mediaRecorder.stop();
+    mediaRecorder.stream.getTracks().forEach(t => t.stop());
+
+    stopped.then(uploadRecording);
   }
 
   async function uploadRecording() {
     if (audioChunks.length === 0) return;
     const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-    if (audioBlob.size < 1000) return; // Ignore very short taps
+    if (audioBlob.size < 500) return; // Ignore accidental taps
+
+    // Show uploading status
+    const oldStatus = $('#chat-status').textContent;
+    $('#chat-status').textContent = 'Sending voice message...';
 
     const fileName = `voice_${Date.now()}.webm`;
     const chatId = [currentUser.id, activeChat.id].sort().join('_');
-    const storageRef = storage.ref(`chats/${chatId}/${fileName}`);
-    
+
     try {
+      const storageRef = storage.ref(`chats/${chatId}/${fileName}`);
       const snapshot = await storageRef.put(audioBlob);
       const audioUrl = await snapshot.ref.getDownloadURL();
       sendVoiceMessage(audioUrl);
     } catch (e) {
-      console.error("Upload error", e);
+      console.error('Upload error', e);
+      alert('Failed to send voice message. Check Firebase Storage rules.\n' + e.message);
+    } finally {
+      $('#chat-status').textContent = oldStatus;
     }
   }
 
