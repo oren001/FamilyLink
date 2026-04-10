@@ -461,7 +461,7 @@ a:hover {
   flex: 1;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
   background: var(--bg-primary);
   position: relative;
 }
@@ -689,6 +689,7 @@ a:hover {
   align-items: flex-end;
   gap: 10px;
   padding: 14px 20px;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-color);
 }
