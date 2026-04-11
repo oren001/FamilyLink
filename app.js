@@ -235,7 +235,7 @@
 
   // ─── Init & Messaging ─────────────────────────────────
 
-  function initChat() {
+  async function initChat() {
     authScreen.classList.remove('active');
     authScreen.style.display = 'none';
     chatScreen.style.display = '';
@@ -248,9 +248,9 @@
     setAvatarEl($('#sidebar-avatar'), currentUser);
     $('#sidebar-username').textContent = currentUser.displayName;
 
+    await initEncryption(); // wait for keys before fetching messages!
     connectMessaging();
     registerPushNotifications();
-    initEncryption();
   }
 
   // ─── E2EE Crypto ──────────────────────────────────────
@@ -305,23 +305,37 @@
     }
   }
 
+  function bufferToBase64(buf) {
+    const arr = new Uint8Array(buf);
+    let str = '';
+    for (let i = 0; i < arr.length; i += 1024) {
+      str += String.fromCharCode.apply(null, arr.subarray(i, i + 1024));
+    }
+    return btoa(str);
+  }
+
+  function base64ToBuffer(b64) {
+    const str = atob(b64);
+    const arr = new Uint8Array(str.length);
+    for (let i = 0; i < str.length; i++) arr[i] = str.charCodeAt(i);
+    return arr;
+  }
+
   async function encryptText(text, sharedKey) {
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const enc = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, sharedKey, new TextEncoder().encode(text));
-    return {
-      iv:   btoa(String.fromCharCode(...iv)),
-      data: btoa(String.fromCharCode(...new Uint8Array(enc)))
-    };
+    return { iv: bufferToBase64(iv), data: bufferToBase64(enc) };
   }
 
   async function decryptText(obj, sharedKey) {
     try {
-      const iv   = Uint8Array.from(atob(obj.iv),   c => c.charCodeAt(0));
-      const data = Uint8Array.from(atob(obj.data), c => c.charCodeAt(0));
-      const dec  = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, sharedKey, data);
+      const iv = base64ToBuffer(obj.iv);
+      const data = base64ToBuffer(obj.data);
+      const dec = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, sharedKey, data);
       return new TextDecoder().decode(dec);
-    } catch {
-      return null; // Decryption failed (different device / missing key)
+    } catch (e) {
+      console.error('Decryption failed for obj:', obj, 'Error:', e);
+      return null;
     }
   }
 
